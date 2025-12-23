@@ -4,6 +4,10 @@ import re
 import time
 from qrcode import QRCode
 from qrcode.image.pil import PilImage
+import os
+import json
+import time
+
 def get_name_aid_cid(bv,pp,headers):
      vedio_info_url = f"https://api.bilibili.com/x/web-interface/view?bvid={bv}"
      print(f"aid和cid的查询接口 {vedio_info_url}")
@@ -109,7 +113,7 @@ def get_QRcode(request_headers):
           pil_img.show()
           return qrcode_key
      else:
-          print("生成二维码失败")
+          print("\033[91m生成二维码失败\033[0m")
 
 def get_cookie(qrcode_key,headers):
      check_login_url = f'https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key={qrcode_key}&source=main-fe-header'
@@ -169,29 +173,100 @@ def fetch_title(bv,pp,headers):
      else:
           print("没有字幕")
 
+def load_existing_cookies(headers):
+    """
+    加载已存在的cookies文件
+    
+    Args:
+        headers: 请求头字典
+    
+    Returns:
+        bool: 是否成功加载cookies
+    """
+    try:
+        # 检查cookies.json文件是否存在
+        if not os.path.exists("cookies.json"):
+            print("cookies.json文件不存在")
+            return False
+        
+        with open("cookies.json", 'r', encoding='utf-8') as f:
+            cookies = json.loads(f.read())
+            # 检查cookie是否有效
+            if cookies and len(cookies) > 0:
+                headers["Cookie"] = ";".join([f"{key}={value}" for key, value in cookies.items()])
+                print("\033[92m成功加载cookies\033[0m")
+                return True
+            else:
+                print("\033[91mcookies文件为空或无效\033[0m")
+                return False
+                
+    except (json.JSONDecodeError, KeyError, Exception) as e:
+        print(f"\033[91m加载cookies文件失败: {e}\033[0m")
+        return False
+
+def acquire_new_cookies(headers):
+    """
+    获取新的cookies（通过二维码登录）
+    Args:
+        headers: 请求头字典
+    Returns:
+        bool: 是否成功获取cookies
+    """
+    print("开始获取新的cookies...")
+    
+    # 获取二维码并等待用户扫描
+    qrcode_key = get_QRcode(headers)
+    try:
+          get_cookie(qrcode_key, headers)
+          print("成功获取cookies")
+          return True
+    except Exception as e:
+          print(f"\033[91m获取cookies失败: {e}\033[0m")
+    return False
+
+def load_cookies_with_retry(headers, max_retries=3):
+    """
+    加载cookies的主函数，包含重试机制
+    Args:
+        headers: 请求头字典
+        max_retries: 最大重试次数
+        max_qr_retries: 二维码最大重试次数
+    
+    Returns:
+        bool: 是否成功加载cookies
+    """
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        # 首先尝试加载已存在的cookies
+        if load_existing_cookies(headers):
+            return True
+        
+        # 如果加载失败，则获取新的cookies
+        if acquire_new_cookies(headers):
+            # 获取成功后，再次尝试加载
+            if load_existing_cookies(headers):
+                return True
+        
+        retry_count += 1
+        if retry_count < max_retries:
+            print(f"第{retry_count}次尝试失败，准备重试...")
+            time.sleep(2)  # 等待2秒后重试
+    
+    print("已达到最大重试次数，程序退出")
+    return False
+
 if __name__ == "__main__":
      headers = {
-     'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",
-     "Origin": "https://www.bilibili.com",
-     "Referer": "https://www.bilibili.com"
+           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+           "Origin": "https://www.bilibili.com",
+           "Referer": "https://www.bilibili.com"
      }
 
-     #使用ansi转义码 红色字提示定期检查cookie是否过期
-     print("\033[91m提示：请定期删除cookies文件并进行重新扫码，以确保cookie的有效性\033[0m")
-     
-     #如果文件存在，读取cookie 如果不存在使用get_cookie()函数生成二维码登录获取cookie
-     while True:
-          try:
-               with open("cookies.json",'r') as f:
-                    cookies = json.loads(f.read())
-                    headers["Cookie"] = ";".join([f"{key}={value}" for key, value in cookies.items()])
-                    print(cookies)
-               break
-          except FileNotFoundError:
-               print("cookies.json文件不存在,请登录获取cookie")
-               qrcode_key = get_QRcode(headers)
-               get_cookie(qrcode_key,headers)
 
+     if not load_cookies_with_retry(headers):
+         print("无法获取cookies，程序退出")
+         exit(1)
 
      url = input("\033[94m请输入需要获取字幕的视频链接：\033[0m")
      bv,p = get_bv_p(url)
