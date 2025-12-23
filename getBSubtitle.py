@@ -5,8 +5,7 @@ import time
 from qrcode import QRCode
 from qrcode.image.pil import PilImage
 import os
-import json
-import time
+
 
 def get_name_aid_cid(bv,pp,headers):
      vedio_info_url = f"https://api.bilibili.com/x/web-interface/view?bvid={bv}"
@@ -165,7 +164,11 @@ def fetch_title(bv,pp,headers):
      if chinese_contents or english_contents:
           contents = english_contents + chinese_contents
           try:
-               with open(f"{name}.md",'w') as f:
+               result_dir = "./result"
+               if not os.path.exists(result_dir):
+                    os.makedirs(result_dir)
+               # 将字幕文件写入result目录
+               with open(f"{result_dir}/{name}.md",'w') as f:
                     f.write(contents)
                print(f"\033[92m字幕文件{name}.md写入成功\033[0m")
           except Exception as e:
@@ -268,9 +271,14 @@ if __name__ == "__main__":
          print("无法获取cookies，程序退出")
          exit(1)
 
-     url = input("\033[94m请输入需要获取字幕的视频链接：\033[0m")
-     bv,p = get_bv_p(url)
-     if bv and p:
-          fetch_title(bv,p,headers)
-     else:
-          print("\033[91mError: 输入的链接格式错误\033[0m")
+     is_continue = True
+
+     while is_continue:
+          url = input("\033[94m请输入需要获取字幕的视频链接：\033[0m")
+          bv,p = get_bv_p(url)
+          if bv and p:
+               fetch_title(bv,p,headers)
+          else:
+               print("\033[91mError: 输入的链接格式错误\033[0m")
+          is_continue = input("\033[94m是否继续获取字幕？(y/n)\033[0m") == "y"
+     print("\033[92m拜拜~~😊😊😊\033[0m")
