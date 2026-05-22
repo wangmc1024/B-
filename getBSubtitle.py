@@ -168,7 +168,7 @@ def fetch_title(bv,pp,headers):
                if not os.path.exists(result_dir):
                     os.makedirs(result_dir)
                # 将字幕文件写入result目录
-               with open(f"{result_dir}/{name}.md",'w') as f:
+               with open(f"{result_dir}/{name}.md",'w', encoding='utf-8') as f:
                     f.write(contents)
                print(f"\033[92m字幕文件{name}.md写入成功\033[0m")
           except Exception as e:
